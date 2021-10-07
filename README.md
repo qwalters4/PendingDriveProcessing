@@ -1,5 +1,6 @@
 # PendingDriveProcessing
 Takes pending drives, processes them and archives them.
+These drives are already scanned and serialized to json reports.
 
 # Directory Layout
 *<br />
