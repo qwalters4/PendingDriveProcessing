@@ -2,7 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading;
@@ -41,7 +43,8 @@ namespace PendingDriveProcessor
 
             #region Deserialize and build dictionary
             Dictionary<string, string> knownff = new Dictionary<string, string>();
-            List<string> unknown = new List<string>();
+            List<string> unknownModel = new List<string>();
+            List<PhysicalDisk> unknownDisk = new List<PhysicalDisk>();
             string dic = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             knownff = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(Path.Combine(@dic, "KnownDriveDictionary.json")));
             #endregion
@@ -50,6 +53,8 @@ namespace PendingDriveProcessor
             bool found = false;
 
             #region Check all disks and check if its in DB
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
             foreach (PhysicalDisk p in pending)
             {
                 foreach (KeyValuePair<string, string> kv in knownff)
@@ -64,20 +69,25 @@ namespace PendingDriveProcessor
                 }
                 if (!found)
                 {
-                    if(!unknown.Contains(p.ModelId))
+                    if(!unknownModel.Contains(p.ModelId))
                     {
                         Console.WriteLine("ModelID: " + p.ModelId);
                         Console.WriteLine("SerialNumber: " + p.SerialNumber + "\n");
-                        unknown.Add(p.ModelId);
+                        unknownModel.Add(p.ModelId);
                     }
-                    pending.Remove(p);
+                    unknownDisk.Add(p);
                 }
                 found = false;
             }
-            Console.WriteLine("Successfully parsed all pending drives.");
+            foreach(PhysicalDisk p in unknownDisk)
+            {
+                pending.Remove(p);
+            }
+            stopwatch.Stop();
+            Console.WriteLine("Successfully parsed all pending drives in " + stopwatch.ElapsedMilliseconds/1000.0 + "s.");
             #endregion
 
-            File.WriteAllLines(Path.Combine(dic, "UnknownDrives.txt"), unknown);
+            File.WriteAllLines(Path.Combine(dic, "UnknownDrives.txt"), unknownModel);
 
             Console.WriteLine("Number of form factors changed: " + i);
 
@@ -98,8 +108,10 @@ namespace PendingDriveProcessor
             }
 
             DirectoryInfo di = new DirectoryInfo(Path.Combine(@curPath, "Pending"));
+            List<string> properties = unknownDisk.Select(o => o.SerialNumber).ToList();
             foreach (FileInfo file in di.EnumerateFiles())
             {
+                if (!properties.Contains(file.Name.Substring(0, file.Name.Length - 5)))
                     file.Delete();
             }
             #endregion
