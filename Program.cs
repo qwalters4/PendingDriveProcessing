@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace PendingDriveProcessor
 {
@@ -32,6 +33,8 @@ namespace PendingDriveProcessor
             #endregion
 
             #region Read every file from Pending and add to list
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
             List<PhysicalDisk> pending = new List<PhysicalDisk>();
 
             foreach (string file in Directory.EnumerateFiles(Path.Combine(@curPath, "Pending"), "*.json"))
@@ -39,23 +42,29 @@ namespace PendingDriveProcessor
                 PhysicalDisk temp = JsonConvert.DeserializeObject<PhysicalDisk>(File.ReadAllText(file));
                 pending.Add(temp);
             }
+            stopwatch.Stop();
+            Console.WriteLine("Finished deserializing in " + stopwatch.ElapsedMilliseconds / 1000.0 + "s.");
+            stopwatch.Reset();
             #endregion
 
             #region Deserialize and build dictionary
+            stopwatch.Start();
             Dictionary<string, string> knownff = new Dictionary<string, string>();
             List<string> unknownModel = new List<string>();
             List<PhysicalDisk> unknownDisk = new List<PhysicalDisk>();
             string dic = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             knownff = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(Path.Combine(@dic, "KnownDriveDictionary.json")));
+            stopwatch.Stop();
+            Console.WriteLine("Finished constructing dictionary in " + stopwatch.ElapsedMilliseconds/1000.0 + "s.");
+            stopwatch.Reset();
             #endregion
 
             int i = 0;
             bool found = false;
 
             #region Check all disks and check if its in DB
-            Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
-            foreach (PhysicalDisk p in pending)
+            Parallel.ForEach(pending, p =>
             {
                 foreach (KeyValuePair<string, string> kv in knownff)
                 {
@@ -69,7 +78,7 @@ namespace PendingDriveProcessor
                 }
                 if (!found)
                 {
-                    if(!unknownModel.Contains(p.ModelId))
+                    if (!unknownModel.Contains(p.ModelId))
                     {
                         Console.WriteLine("ModelID: " + p.ModelId);
                         Console.WriteLine("SerialNumber: " + p.SerialNumber + "\n");
@@ -78,13 +87,14 @@ namespace PendingDriveProcessor
                     unknownDisk.Add(p);
                 }
                 found = false;
-            }
+            });
             foreach(PhysicalDisk p in unknownDisk)
             {
                 pending.Remove(p);
             }
             stopwatch.Stop();
             Console.WriteLine("Successfully parsed all pending drives in " + stopwatch.ElapsedMilliseconds/1000.0 + "s.");
+            stopwatch.Reset();
             #endregion
 
             File.WriteAllLines(Path.Combine(dic, "UnknownDrives.txt"), unknownModel);
@@ -93,8 +103,9 @@ namespace PendingDriveProcessor
 
             #region Sort and write to Archive then delete from Pending
             Console.WriteLine("Archiving...");
+            stopwatch.Start();
             string path;
-            foreach (PhysicalDisk p in pending)
+            foreach( PhysicalDisk p in pending)
             {
                 if (!Directory.Exists(Path.Combine(@curPath, "Archive", p.PONumber.ToString())))
                     Directory.CreateDirectory(Path.Combine(@curPath, "Archive", p.PONumber.ToString()));
@@ -109,11 +120,13 @@ namespace PendingDriveProcessor
 
             DirectoryInfo di = new DirectoryInfo(Path.Combine(@curPath, "Pending"));
             List<string> properties = unknownDisk.Select(o => o.SerialNumber).ToList();
-            foreach (FileInfo file in di.EnumerateFiles())
+            Parallel.ForEach(di.EnumerateFiles(), file =>
             {
                 if (!properties.Contains(file.Name.Substring(0, file.Name.Length - 5)))
                     file.Delete();
-            }
+            });
+            stopwatch.Stop();
+            Console.WriteLine("Finished in " + stopwatch.ElapsedMilliseconds/1000.0 + "s.");
             #endregion
 
             Console.WriteLine("Complete");
