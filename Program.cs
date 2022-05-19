@@ -18,7 +18,7 @@ namespace PendingDriveProcessor
         {
             #region Check if Pending exists
             Console.Write("Current Directory: ");
-            string curPath = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+            string curPath = @"\\TRUENAS\DiskTesting";
             Console.Write(curPath + "\n");
             Console.WriteLine("Attempting to read from Pending...");
             //Thread.Sleep(1000);
@@ -52,7 +52,7 @@ namespace PendingDriveProcessor
             Dictionary<string, string> knownff = new Dictionary<string, string>();
             List<string> unknownModel = new List<string>();
             List<PhysicalDisk> unknownDisk = new List<PhysicalDisk>();
-            string dic = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+            string dic = @"\\TRUENAS\DiskTesting";
             knownff = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(Path.Combine(@dic, "KnownDriveDictionary.json")));
             stopwatch.Stop();
             Console.WriteLine("Finished constructing dictionary in " + stopwatch.ElapsedMilliseconds/1000.0 + "s.");
@@ -63,9 +63,35 @@ namespace PendingDriveProcessor
             bool found = false;
 
             #region Check all disks and check if its in DB
+            List<string> tokens = new List<string>();
+            List<string> brands = new List<string> { "wdc", "wd", "seagate", "intel", "hitachi",
+                "adata", "apacer", "apple", "axiom", "corsair", "crucial", "diesel", "fujitsu", 
+                "hgst", "hp", "ibm", "kingfast", "kingston", "toshiba", "lenovo", "lexar", "liteon",
+                "liteonit", "maxtor", "mercury", "micron", "netapp", "ocz", "owc", "patriot", "samsung",
+                "pny", "sandisk", "sic", "sk hynix", "skhynix", "spcc", "visiontek", "wintek", "kioxia",
+                "plextor", "transcend", "quantum", "mushkin", "dell"};
+
             stopwatch.Start();
             Parallel.ForEach(pending, p =>
             {
+                if (p.ModelId.Substring(0, 2).ToLower() == "st")
+                    p.Brand = "seagate";
+                else if (p.ModelId.Substring(0, 2).ToLower() == "ct")
+                    p.Brand = "crucial";
+                else
+                {
+                    foreach (string s in brands)
+                    {
+                        if (p.ModelId.ToLower().Contains(s))
+                        {
+                            p.Brand = s;
+                        }
+                    }
+                }
+
+                if (p.Brand == null)
+                    p.Brand = "Unknown";
+                
                 foreach (KeyValuePair<string, string> kv in knownff)
                 {
                     if (p.ModelId.Contains(kv.Key))

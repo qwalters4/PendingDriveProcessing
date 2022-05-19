@@ -12,6 +12,47 @@ namespace PendingDriveProcessor
     /// </summary>
     internal class PhysicalDisk
     {
+
+        private string connector;
+        public string Connector
+        {
+            get
+            {
+                return connector;
+            }
+            set
+            {
+                connector = value;
+            }
+        }
+
+        private string brand;
+        public string Brand
+        {
+            get
+            {
+                return brand;
+            }
+            set
+            {
+                brand = value;
+            }
+        }
+
+        private DateTime time;
+
+        public DateTime Time
+        {
+            get
+            {
+                return time;
+            }
+            set
+            {
+                time = value;
+            }
+        }
+
         private string formfactor;
         public string FormFactor
         {
