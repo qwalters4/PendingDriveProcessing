@@ -144,6 +144,9 @@ namespace PendingDriveProcessor
                 }
             }
 
+            DataService dataService = new DataService();
+            dataService.InsertFailsafe(pending);
+
             DirectoryInfo di = new DirectoryInfo(Path.Combine(@curPath, "Pending"));
             List<string> properties = unknownDisk.Select(o => o.SerialNumber).ToList();
             Parallel.ForEach(di.EnumerateFiles(), file =>

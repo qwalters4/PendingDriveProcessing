@@ -10,7 +10,7 @@ namespace PendingDriveProcessor
     /// <summary>
     /// Represents a physical disk.
     /// </summary>
-    internal class PhysicalDisk
+    public class PhysicalDisk
     {
 
         private string connector;
@@ -36,6 +36,19 @@ namespace PendingDriveProcessor
             set
             {
                 brand = value;
+            }
+        }
+
+        private int capacity;
+        public int Capacity
+        {
+            get
+            {
+                return (int)(Size / 1000000000);
+            }
+            set
+            {
+                capacity = value;
             }
         }
 
