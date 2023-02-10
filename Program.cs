@@ -36,11 +36,15 @@ namespace PendingDriveProcessor
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
             List<PhysicalDisk> pending = new List<PhysicalDisk>();
+            List<PhysicalDisk> missingFF = new List<PhysicalDisk>();
 
-            foreach (string file in Directory.EnumerateFiles(Path.Combine(@curPath, "Pending"), "*.json"))
+            int i = 0;
+            foreach (string file in Directory.EnumerateFiles(Path.Combine(@curPath, "Pending"), "*.json"))  
             {
                 PhysicalDisk temp = JsonConvert.DeserializeObject<PhysicalDisk>(File.ReadAllText(file));
                 pending.Add(temp);
+                Console.WriteLine(temp.SerialNumber + "\t" + i);
+                i++;
             }
             stopwatch.Stop();
             Console.WriteLine("Finished deserializing in " + stopwatch.ElapsedMilliseconds / 1000.0 + "s.");
@@ -59,7 +63,6 @@ namespace PendingDriveProcessor
             stopwatch.Reset();
             #endregion
 
-            int i = 0;
             bool found = false;
 
             #region Check all disks and check if its in DB
@@ -74,43 +77,46 @@ namespace PendingDriveProcessor
             stopwatch.Start();
             Parallel.ForEach(pending, p =>
             {
-                if (p.ModelId.Substring(0, 2).ToLower() == "st")
-                    p.Brand = "seagate";
-                else if (p.ModelId.Substring(0, 2).ToLower() == "ct")
-                    p.Brand = "crucial";
-                else
+                if(p.FormFactor == "")
                 {
-                    foreach (string s in brands)
+                    if (p.ModelId.Substring(0, 2).ToLower() == "st")
+                        p.Brand = "seagate";
+                    else if (p.ModelId.Substring(0, 2).ToLower() == "ct")
+                        p.Brand = "crucial";
+                    else
                     {
-                        if (p.ModelId.ToLower().Contains(s))
+                        foreach (string s in brands)
                         {
-                            p.Brand = s;
+                            if (p.ModelId.ToLower().Contains(s))
+                            {
+                                p.Brand = s;
+                            }
                         }
                     }
-                }
 
-                if (p.Brand == null)
-                    p.Brand = "Unknown";
-                
-                foreach (KeyValuePair<string, string> kv in knownff)
-                {
-                    if (p.ModelId.Contains(kv.Key))
+                    if (p.Brand == null)
+                        p.Brand = "Unknown";
+
+                    foreach (KeyValuePair<string, string> kv in knownff)
                     {
-                        p.FormFactor = kv.Value;
-                        i++;
-                        found = true;
-                        break;
+                        if (p.ModelId.Contains(kv.Key))
+                        {
+                            p.FormFactor = kv.Value;
+                            i++;
+                            found = true;
+                            break;
+                        }
                     }
-                }
-                if (!found)
-                {
-                    if (!unknownModel.Contains(p.ModelId))
+                    if (!found)
                     {
-                        Console.WriteLine("ModelID: " + p.ModelId);
-                        Console.WriteLine("SerialNumber: " + p.SerialNumber + "\n");
-                        unknownModel.Add(p.ModelId);
+                        if (!unknownModel.Contains(p.ModelId))
+                        {
+                            Console.WriteLine("ModelID: " + p.ModelId);
+                            Console.WriteLine("SerialNumber: " + p.SerialNumber + "\n");
+                            unknownModel.Add(p.ModelId);
+                        }
+                        unknownDisk.Add(p);
                     }
-                    unknownDisk.Add(p);
                 }
                 found = false;
             });
@@ -133,14 +139,24 @@ namespace PendingDriveProcessor
             string path;
             foreach( PhysicalDisk p in pending)
             {
+                Console.WriteLine(p.SerialNumber);
                 if (!Directory.Exists(Path.Combine(@curPath, "Archive", p.PONumber.ToString())))
                     Directory.CreateDirectory(Path.Combine(@curPath, "Archive", p.PONumber.ToString()));
                 path = Path.Combine(@curPath, "Archive", p.PONumber.ToString(), (p.SerialNumber + ".json"));
-                JsonSerializer s = new JsonSerializer();
-                using (StreamWriter sw = new StreamWriter(path))
-                using (JsonWriter w = new JsonTextWriter(sw))
+                try
                 {
-                    s.Serialize(w, p);
+                    JsonSerializer s = new JsonSerializer();
+                    using (StreamWriter sw = new StreamWriter(path))
+                    using (JsonWriter w = new JsonTextWriter(sw))
+                    {
+                        s.Serialize(w, p);
+                    }
+
+                    File.Delete(Path.Combine(@curPath, "Pending", (p.SerialNumber + ".json")));
+                }
+                catch
+                {
+                    Console.WriteLine("Write failed for: ", p.SerialNumber);
                 }
             }
 
