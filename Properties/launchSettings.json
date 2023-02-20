@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "PendingDriveProcessor": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
